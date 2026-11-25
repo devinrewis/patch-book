@@ -68,6 +68,7 @@
     btnNextPage: document.getElementById("btn-next-page"),
     pageCounter: document.getElementById("page-counter"),
     pageTabs: document.getElementById("page-tabs"),
+    btnDupPageBar: document.getElementById("btn-dup-page-bar"),
     btnAddPageBar: document.getElementById("btn-add-page-bar"),
 
     patchList: document.getElementById("patch-list"),
@@ -260,6 +261,19 @@
     showToast(`Deleted patchbook "${book.name}"`);
   }
 
+  function getUniqueBookName(baseName) {
+    const clean = (baseName || "Shared Patchbook").trim();
+    const exists = (candidate) =>
+      state.books.some((b) => b.name.trim().toLowerCase() === candidate.toLowerCase());
+    if (!exists(clean)) return clean;
+
+    let n = 2;
+    while (exists(`${clean} (${n})`)) {
+      n += 1;
+    }
+    return `${clean} (${n})`;
+  }
+
   function addBookFromData(name, rawPatches) {
     // Re-key IDs so imported/shared books never collide with existing ones
     const pages = rawPatches.map((p) => ({
@@ -268,7 +282,7 @@
     }));
     const newBook = {
       id: uid("book"),
-      name: name || "Shared Patchbook",
+      name: getUniqueBookName(name || "Shared Patchbook"),
       activePatchId: pages[0].id,
       patches: pages,
     };
@@ -381,7 +395,10 @@
           <div class="patch-item-name">${escapeHtml(patch.name)}</div>
           <div class="patch-item-meta">${escapeHtml(meta)}</div>
         </div>
-        ${activeBook.patches.length > 1 ? `<button class="patch-item-del" title="Delete page">×</button>` : ""}
+        <div class="patch-item-actions">
+          <button class="patch-item-btn patch-item-dup" title="Duplicate page">⧉</button>
+          ${activeBook.patches.length > 1 ? `<button class="patch-item-del" title="Delete page">×</button>` : ""}
+        </div>
       `;
 
       li.addEventListener("dragstart", (e) => {
@@ -430,6 +447,11 @@
       });
 
       li.addEventListener("click", (e) => {
+        if (e.target.classList.contains("patch-item-dup")) {
+          e.stopPropagation();
+          duplicatePage(patch.id);
+          return;
+        }
         if (e.target.classList.contains("patch-item-del")) {
           e.stopPropagation();
           if (confirm(`Delete page "${patch.name}"?`)) {
@@ -1092,6 +1114,42 @@
     renderAll();
   }
 
+  function duplicatePage(patchId) {
+    const book = getActiveBook();
+    if (!book) return;
+    const srcIdx = book.patches.findIndex((p) => p.id === patchId);
+    if (srcIdx < 0) return;
+
+    const src = book.patches[srcIdx];
+    const copy = clone(src);
+    copy.id = uid("patch");
+    copy.name = `${src.name} (Copy)`;
+
+    // Re-key module, param, and connection IDs cleanly
+    const modIdMap = {};
+    copy.modules.forEach((m) => {
+      const oldId = m.id;
+      const newId = uid("mod");
+      modIdMap[oldId] = newId;
+      m.id = newId;
+      (m.params || []).forEach((p) => {
+        p.id = uid("p");
+      });
+    });
+    copy.connections.forEach((c) => {
+      c.id = uid("c");
+      c.from = modIdMap[c.from] || c.from;
+      c.to = modIdMap[c.to] || c.to;
+    });
+
+    book.patches.splice(srcIdx + 1, 0, copy);
+    book.activePatchId = copy.id;
+    closePopovers();
+    persist();
+    renderAll();
+    showToast(`Duplicated "${src.name}"`);
+  }
+
   function addModuleFromTemplate(tpl) {
     const patch = getActivePatch();
     if (!patch) return;
@@ -1454,9 +1512,13 @@
     requestAnimationFrame(renderConnections);
   });
 
-  // New Page, Label Block & Blank Module
+  // New Page, Duplicate Page, Label Block & Blank Module
   dom.btnNewPatch.addEventListener("click", createNewPage);
   dom.btnAddPageBar.addEventListener("click", createNewPage);
+  dom.btnDupPageBar.addEventListener("click", () => {
+    const patch = getActivePatch();
+    if (patch) duplicatePage(patch.id);
+  });
 
   dom.btnNewLabelBlock.addEventListener("click", () => {
     addModuleFromTemplate({

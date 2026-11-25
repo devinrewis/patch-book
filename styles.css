@@ -493,13 +493,28 @@ html, body {
   margin-top: 2px;
 }
 
-.patch-item-del {
+.patch-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.patch-item-btn, .patch-item-del {
   background: transparent;
   border: none;
   color: var(--text-dim);
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
   padding: 0 3px;
+}
+
+.patch-item-btn:hover {
+  color: var(--accent);
+}
+
+.patch-item-del {
+  font-size: 13px;
 }
 
 .patch-item-del:hover {
