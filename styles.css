@@ -818,13 +818,16 @@ html, body {
   cursor: ew-resize;
 }
 
-/* 3-Way Switch */
+/* Multi-Way Switch */
 .switch3-group {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   border: 1px solid var(--border-strong);
   border-radius: 3px;
   overflow: hidden;
   background: var(--bg-app);
+  max-width: 132px;
 }
 
 .switch3-btn {
@@ -837,6 +840,8 @@ html, body {
   padding: 3px 5px;
   cursor: pointer;
   border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  flex: 1 0 auto;
 }
 
 .switch3-btn:last-child {
@@ -846,6 +851,26 @@ html, body {
 .switch3-btn.active {
   background: var(--accent);
   color: #141619;
+}
+
+/* Dropdown Box */
+.arp-dropdown {
+  background: var(--bg-app);
+  border: 1px solid var(--border-strong);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 6px;
+  border-radius: 3px;
+  max-width: 126px;
+  width: 100%;
+  cursor: pointer;
+}
+
+.arp-dropdown:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 
 /* ==========================================================================
@@ -1161,6 +1186,7 @@ body.perform-mode .param-name-input {
 
 body.perform-mode .knob-svg,
 body.perform-mode .arp-slider,
-body.perform-mode .switch3-btn {
+body.perform-mode .switch3-btn,
+body.perform-mode .arp-dropdown {
   pointer-events: none;
 }

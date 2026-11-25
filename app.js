@@ -557,7 +557,9 @@
     } else if (param.type === "slider") {
       controlWrap.appendChild(createSliderWidget(param));
     } else if (param.type === "switch3") {
-      controlWrap.appendChild(createSwitch3Widget(param));
+      controlWrap.appendChild(createSwitchWidget(param));
+    } else if (param.type === "dropdown") {
+      controlWrap.appendChild(createDropdownWidget(param));
     }
 
     const removeBtn = document.createElement("button");
@@ -682,11 +684,11 @@
     return wrap;
   }
 
-  function createSwitch3Widget(param) {
+  function createSwitchWidget(param) {
     const group = document.createElement("div");
     group.className = "switch3-group";
     const labels =
-      Array.isArray(param.labels) && param.labels.length === 3
+      Array.isArray(param.labels) && param.labels.length >= 2
         ? param.labels
         : ["LO", "MID", "HI"];
 
@@ -707,6 +709,32 @@
     });
 
     return group;
+  }
+
+  function createDropdownWidget(param) {
+    const select = document.createElement("select");
+    select.className = "arp-dropdown";
+    const labels =
+      Array.isArray(param.labels) && param.labels.length >= 1
+        ? param.labels
+        : ["OPT 1", "OPT 2", "OPT 3"];
+
+    labels.forEach((lbl, idx) => {
+      const opt = document.createElement("option");
+      opt.value = String(idx);
+      opt.textContent = lbl;
+      if (param.value === idx) opt.selected = true;
+      select.appendChild(opt);
+    });
+
+    select.addEventListener("mousedown", (e) => e.stopPropagation());
+    select.addEventListener("change", () => {
+      if (mode === "perform") return;
+      param.value = parseInt(select.value, 10) || 0;
+      persist();
+    });
+
+    return select;
   }
 
   function polarToCartesian(cx, cy, r, angleInDegrees) {
@@ -1322,7 +1350,8 @@
   // Add Parameter Popover Actions
   dom.btnCloseParamPopover.addEventListener("click", closePopovers);
   dom.newParamType.addEventListener("change", () => {
-    dom.switchLabelsWrap.hidden = dom.newParamType.value !== "switch3";
+    const t = dom.newParamType.value;
+    dom.switchLabelsWrap.hidden = t !== "switch3" && t !== "dropdown";
   });
 
   dom.btnConfirmAddParam.addEventListener("click", () => {
@@ -1332,19 +1361,20 @@
 
     const type = dom.newParamType.value;
     const name = dom.newParamName.value.trim().toUpperCase() || "PARAM";
+    const isDiscrete = type === "switch3" || type === "dropdown";
     const paramObj = {
       id: uid("p"),
       name,
       type,
-      value: type === "switch3" ? 0 : 0.5,
+      value: isDiscrete ? 0 : 0.5,
     };
 
-    if (type === "switch3") {
+    if (isDiscrete) {
       const parts = dom.newParamSwitchLabels.value
         .split(",")
         .map((s) => s.trim().toUpperCase())
         .filter(Boolean);
-      paramObj.labels = [parts[0] || "LO", parts[1] || "MID", parts[2] || "HI"];
+      paramObj.labels = parts.length >= 2 ? parts : ["LO", "MID", "HI"];
     }
 
     mod.params.push(paramObj);
