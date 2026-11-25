@@ -603,8 +603,22 @@
       titleInput.className = "module-title-input";
       titleInput.value = mod.title;
       titleInput.addEventListener("mousedown", (e) => e.stopPropagation());
+      if (isLabel) {
+        const syncLabelWidth = () => {
+          titleInput.style.width = `${Math.max(6, titleInput.value.length + 1.5)}ch`;
+        };
+        syncLabelWidth();
+        titleInput.addEventListener("input", () => {
+          syncLabelWidth();
+          requestAnimationFrame(renderConnections);
+        });
+      }
       titleInput.addEventListener("change", () => {
         mod.title = titleInput.value.trim() || (isLabel ? "LABEL" : "MODULE");
+        if (isLabel) {
+          titleInput.value = mod.title;
+          titleInput.style.width = `${Math.max(6, titleInput.value.length + 1.5)}ch`;
+        }
         persist();
         if (isLabel) requestAnimationFrame(renderConnections);
       });
