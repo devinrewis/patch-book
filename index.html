@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ARP Patch Notes — Hardware Synth Patchbook</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- TOP HEADER BAR -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="brand">
+        <span class="brand-mark">◈</span>
+        <span class="brand-title">PATCH<span class="brand-accent">NOTES</span></span>
+      </div>
+      <div class="divider-v"></div>
+
+      <!-- Patchbook Switcher -->
+      <div class="book-switcher">
+        <select id="book-select" class="book-select" aria-label="Select Patchbook" title="Active Patchbook"></select>
+        <button id="btn-new-book" class="mini-btn accent edit-only" title="Create a new Patchbook">+ Book</button>
+        <button id="btn-rename-book" class="mini-btn edit-only" title="Rename current Patchbook">✎</button>
+        <button id="btn-delete-book" class="mini-btn danger edit-only" title="Delete current Patchbook">×</button>
+      </div>
+
+      <div class="divider-v"></div>
+
+      <!-- Active Page Title -->
+      <div class="patch-title-wrap">
+        <input id="patch-name-input" class="patch-name-input" type="text" value="01 - Intro Brass Pad" aria-label="Page Name" />
+        <span class="save-status" id="save-status" title="All changes are automatically saved in this browser">● Saved locally</span>
+      </div>
+    </div>
+
+    <div class="topbar-center">
+      <div class="mode-toggle" role="group" aria-label="Mode">
+        <button id="btn-mode-edit" class="mode-btn active" title="Edit modules, parameters, and connections">EDIT</button>
+        <button id="btn-mode-perform" class="mode-btn" title="Lock canvas for live performance">PERFORM</button>
+      </div>
+    </div>
+
+    <div class="topbar-right">
+      <button id="btn-fit-view" class="icon-btn" title="Fit diagram to screen">⊡ Fit</button>
+      <button id="btn-theme" class="icon-btn" title="Switch between Dark and Light theme">☀ Light</button>
+      <button id="btn-share" class="icon-btn accent-outline" title="Copy a shareable URL for the current patchbook">⤴ Share</button>
+      <button id="btn-export" class="icon-btn" title="Export current patchbook as JSON">↓ Export</button>
+      <button id="btn-import" class="icon-btn" title="Import a patchbook JSON">↑ Import</button>
+      <input id="file-import-input" type="file" accept=".json" hidden />
+    </div>
+  </header>
+
+  <!-- SETLIST PAGE-FLIPPER BAR -->
+  <nav class="page-bar" id="page-bar" aria-label="Patchbook Pages">
+    <div class="page-bar-left">
+      <button id="btn-prev-page" class="page-nav-btn" title="Previous Page (Left Arrow)">◀ Prev</button>
+      <span class="page-counter" id="page-counter">1 / 3</span>
+      <button id="btn-next-page" class="page-nav-btn" title="Next Page (Right Arrow)">Next ▶</button>
+    </div>
+
+    <div class="page-tabs-scroll" id="page-tabs"></div>
+
+    <div class="page-bar-right">
+      <button id="btn-add-page-bar" class="mini-btn accent edit-only" title="Add a new patch page">+ New Page</button>
+    </div>
+  </nav>
+
+  <!-- MAIN WORKSPACE -->
+  <div class="workspace">
+    <!-- LEFT SIDEBAR (Hidden in Perform Mode) -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-header">
+          <span>PATCHBOOKS</span>
+          <button id="btn-sidebar-new-book" class="mini-btn accent">+ Book</button>
+        </div>
+        <ul class="book-list" id="book-list"></ul>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-header">
+          <span>PAGES IN BOOK</span>
+          <button id="btn-new-patch" class="mini-btn accent">+ Page</button>
+        </div>
+        <ul class="patch-list" id="patch-list"></ul>
+      </div>
+
+      <div class="sidebar-section grow">
+        <div class="sidebar-header">
+          <span>MODULE LIBRARY</span>
+          <button id="btn-new-blank-module" class="mini-btn">+ Blank</button>
+        </div>
+        <p class="sidebar-hint">Click to drop a module onto the canvas</p>
+        <div class="template-grid" id="template-grid"></div>
+      </div>
+
+      <div class="sidebar-section legend-section">
+        <div class="sidebar-header"><span>SIGNAL FLOW KEY</span></div>
+        <div class="legend-row">
+          <span class="legend-line audio"></span>
+          <span>Audio: Left → Right</span>
+        </div>
+        <div class="legend-row">
+          <span class="legend-line cv"></span>
+          <span>CV / Mod: Bottom → Top</span>
+        </div>
+        <p class="sidebar-hint">Drag from a right (Audio) or top (CV) port to connect. Click an arrow to edit its labels.</p>
+      </div>
+    </aside>
+
+    <!-- DIAGRAM CANVAS -->
+    <main class="canvas-viewport" id="canvas-viewport">
+      <!-- Perform Mode Banner -->
+      <div class="perform-banner" id="perform-banner">
+        <div class="perform-current">
+          <span class="perform-label" id="perform-page-label">PAGE 1 OF 3</span>
+          <span class="perform-title" id="perform-title">—</span>
+        </div>
+        <div class="perform-next" id="perform-next-wrap">
+          <span class="perform-label">NEXT PAGE</span>
+          <span class="perform-next-title" id="perform-next-title">—</span>
+        </div>
+      </div>
+
+      <!-- Zoom/Pan Transform Layer -->
+      <div class="canvas-stage" id="canvas-stage">
+        <svg class="connections-layer" id="connections-layer" width="1" height="1">
+          <defs>
+            <marker id="arrow-audio" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 1.2 L 9 5 L 0 8.8 z" class="marker-audio" />
+            </marker>
+            <marker id="arrow-cv" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 1.2 L 9 5 L 0 8.8 z" class="marker-cv" />
+            </marker>
+            <marker id="arrow-selected" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse">
+              <path d="M 0 1.2 L 9 5 L 0 8.8 z" class="marker-selected" />
+            </marker>
+          </defs>
+          <g id="arrows-group"></g>
+          <path id="drag-wire" class="drag-wire" d="" style="display: none;" />
+        </svg>
+
+        <!-- HTML Module Blocks Layer -->
+        <div class="modules-layer" id="modules-layer"></div>
+      </div>
+
+      <!-- Floating Connection Label Editor Popover -->
+      <div class="conn-popover" id="conn-popover" hidden>
+        <div class="conn-popover-header">
+          <span id="conn-popover-type">AUDIO CONNECTION</span>
+          <button id="btn-close-conn-popover" class="close-x">×</button>
+        </div>
+        <div class="conn-popover-body">
+          <label>
+            <span>Output Label (Source)</span>
+            <input type="text" id="conn-out-label" placeholder="e.g. SAW OUT" />
+          </label>
+          <label>
+            <span>Input Label (Dest)</span>
+            <input type="text" id="conn-in-label" placeholder="e.g. AUDIO IN" />
+          </label>
+          <div class="conn-popover-actions">
+            <button id="btn-delete-conn" class="mini-btn danger">Delete Arrow</button>
+            <button id="btn-save-conn" class="mini-btn accent">Done</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Floating Add Parameter Popover -->
+      <div class="param-popover" id="param-popover" hidden>
+        <div class="conn-popover-header">
+          <span>ADD PARAMETER</span>
+          <button id="btn-close-param-popover" class="close-x">×</button>
+        </div>
+        <div class="conn-popover-body">
+          <label>
+            <span>Parameter Name</span>
+            <input type="text" id="new-param-name" placeholder="e.g. CUTOFF" />
+          </label>
+          <label>
+            <span>Control Type</span>
+            <select id="new-param-type">
+              <option value="knob">Knob (Rotary Dial)</option>
+              <option value="slider">Slider (Fader)</option>
+              <option value="switch3">3-Way Switch</option>
+            </select>
+          </label>
+          <label id="switch-labels-wrap" hidden>
+            <span>3-Way Labels (comma separated)</span>
+            <input type="text" id="new-param-switch-labels" value="LO,MID,HI" placeholder="SAW,SQR,TRI" />
+          </label>
+          <div class="conn-popover-actions">
+            <button id="btn-confirm-add-param" class="mini-btn accent">Add Parameter</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Canvas Zoom Controls -->
+      <div class="canvas-controls">
+        <button id="btn-zoom-out" class="mini-btn" title="Zoom Out">−</button>
+        <span id="zoom-readout" class="zoom-readout">100%</span>
+        <button id="btn-zoom-in" class="mini-btn" title="Zoom In">+</button>
+      </div>
+
+      <!-- Toast Notification -->
+      <div class="toast" id="toast" hidden></div>
+    </main>
+  </div>
+
+  <script src="storage.js"></script>
+  <script src="presets.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
