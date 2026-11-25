@@ -36,6 +36,7 @@
   let draggingModule = null;
   let panning = null;
   let wiring = null; // { type: "audio"|"cv", fromId, startX, startY }
+  let draggingBookIndex = null;
   let draggingPageIndex = null;
   let draggingParamInfo = null; // { modId, index }
   let selectedConnId = null;
@@ -261,6 +262,47 @@
     showToast(`Deleted patchbook "${book.name}"`);
   }
 
+  function duplicateBook(bookId) {
+    const srcIdx = state.books.findIndex((b) => b.id === bookId);
+    if (srcIdx < 0) return;
+    const src = state.books[srcIdx];
+
+    const pages = src.patches.map((p) => {
+      const copy = clone(p);
+      copy.id = uid("patch");
+      const modIdMap = {};
+      copy.modules.forEach((m) => {
+        const newId = uid("mod");
+        modIdMap[m.id] = newId;
+        m.id = newId;
+        (m.params || []).forEach((param) => {
+          param.id = uid("p");
+        });
+      });
+      copy.connections.forEach((c) => {
+        c.id = uid("c");
+        c.from = modIdMap[c.from] || c.from;
+        c.to = modIdMap[c.to] || c.to;
+      });
+      return copy;
+    });
+
+    const newBook = {
+      id: uid("book"),
+      name: getUniqueBookName(src.name),
+      activePatchId: pages[0].id,
+      patches: pages,
+    };
+
+    state.books.splice(srcIdx + 1, 0, newBook);
+    state.activeBookId = newBook.id;
+    closePopovers();
+    persist();
+    renderAll();
+    fitDiagramToView();
+    showToast(`Duplicated "${src.name}" as "${newBook.name}"`);
+  }
+
   function getUniqueBookName(baseName) {
     const clean = (baseName || "Shared Patchbook").trim();
     const exists = (candidate) =>
@@ -353,22 +395,76 @@
     const activeBook = getActiveBook();
     if (!activeBook) return;
 
-    // Patchbooks list
+    // Patchbooks list (drag to reorder + duplicate/delete)
     dom.bookList.innerHTML = "";
-    state.books.forEach((book) => {
+    state.books.forEach((book, i) => {
       const li = document.createElement("li");
       li.className = "patch-item" + (book.id === activeBook.id ? " active" : "");
+      li.draggable = true;
       const meta = `${book.patches.length} page${book.patches.length === 1 ? "" : "s"}`;
 
       li.innerHTML = `
+        <span class="drag-grip" title="Drag to reorder patchbook">⋮⋮</span>
         <div class="patch-item-info">
           <div class="patch-item-name">${escapeHtml(book.name)}</div>
           <div class="patch-item-meta">${escapeHtml(meta)}</div>
         </div>
-        ${state.books.length > 1 ? `<button class="patch-item-del" title="Delete patchbook">×</button>` : ""}
+        <div class="patch-item-actions">
+          <button class="patch-item-btn book-item-dup" title="Duplicate patchbook">⧉</button>
+          ${state.books.length > 1 ? `<button class="patch-item-del" title="Delete patchbook">×</button>` : ""}
+        </div>
       `;
 
+      li.addEventListener("dragstart", (e) => {
+        draggingBookIndex = i;
+        li.classList.add("dragging-item");
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", book.id);
+      });
+
+      li.addEventListener("dragover", (e) => {
+        if (draggingBookIndex === null || draggingBookIndex === i) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        const rect = li.getBoundingClientRect();
+        const isAbove = e.clientY < rect.top + rect.height / 2;
+        li.classList.toggle("drag-over-above", isAbove);
+        li.classList.toggle("drag-over-below", !isAbove);
+      });
+
+      li.addEventListener("dragleave", () => {
+        li.classList.remove("drag-over-above", "drag-over-below");
+      });
+
+      li.addEventListener("drop", (e) => {
+        e.preventDefault();
+        li.classList.remove("drag-over-above", "drag-over-below");
+        if (draggingBookIndex === null || draggingBookIndex === i) return;
+
+        const rect = li.getBoundingClientRect();
+        const isAbove = e.clientY < rect.top + rect.height / 2;
+        let targetIdx = isAbove ? i : i + 1;
+        if (draggingBookIndex < targetIdx) targetIdx -= 1;
+
+        const [moved] = state.books.splice(draggingBookIndex, 1);
+        state.books.splice(targetIdx, 0, moved);
+        draggingBookIndex = null;
+        persist();
+        renderTopBar();
+        renderSidebar();
+      });
+
+      li.addEventListener("dragend", () => {
+        draggingBookIndex = null;
+        li.classList.remove("dragging-item", "drag-over-above", "drag-over-below");
+      });
+
       li.addEventListener("click", (e) => {
+        if (e.target.classList.contains("book-item-dup")) {
+          e.stopPropagation();
+          duplicateBook(book.id);
+          return;
+        }
         if (e.target.classList.contains("patch-item-del")) {
           e.stopPropagation();
           deleteBook(book.id);
