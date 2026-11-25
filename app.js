@@ -71,6 +71,7 @@
     patchList: document.getElementById("patch-list"),
     templateGrid: document.getElementById("template-grid"),
     btnNewPatch: document.getElementById("btn-new-patch"),
+    btnNewLabelBlock: document.getElementById("btn-new-label-block"),
     btnNewBlankModule: document.getElementById("btn-new-blank-module"),
 
     canvasViewport: document.getElementById("canvas-viewport"),
@@ -421,8 +422,9 @@
     if (!patch) return;
 
     patch.modules.forEach((mod) => {
+      const isLabel = mod.kind === "label";
       const el = document.createElement("div");
-      el.className = "module-block";
+      el.className = "module-block" + (isLabel ? " label-block" : "");
       el.dataset.id = mod.id;
       el.style.left = `${mod.x}px`;
       el.style.top = `${mod.y}px`;
@@ -435,35 +437,39 @@
       titleInput.value = mod.title;
       titleInput.addEventListener("mousedown", (e) => e.stopPropagation());
       titleInput.addEventListener("change", () => {
-        mod.title = titleInput.value.trim() || "MODULE";
+        mod.title = titleInput.value.trim() || (isLabel ? "LABEL" : "MODULE");
         persist();
+        if (isLabel) requestAnimationFrame(renderConnections);
       });
 
       const actions = document.createElement("div");
       actions.className = "module-actions";
 
-      const btnSaveTpl = document.createElement("button");
-      btnSaveTpl.className = "mod-act-btn";
-      btnSaveTpl.title = "Save module to Library";
-      btnSaveTpl.textContent = "★";
-      btnSaveTpl.addEventListener("mousedown", (e) => e.stopPropagation());
-      btnSaveTpl.addEventListener("click", () => saveModuleAsTemplate(mod));
+      if (!isLabel) {
+        const btnSaveTpl = document.createElement("button");
+        btnSaveTpl.className = "mod-act-btn";
+        btnSaveTpl.title = "Save module to Library";
+        btnSaveTpl.textContent = "★";
+        btnSaveTpl.addEventListener("mousedown", (e) => e.stopPropagation());
+        btnSaveTpl.addEventListener("click", () => saveModuleAsTemplate(mod));
+        actions.append(btnSaveTpl);
+      }
 
       const btnDup = document.createElement("button");
       btnDup.className = "mod-act-btn";
-      btnDup.title = "Duplicate module";
+      btnDup.title = isLabel ? "Duplicate label" : "Duplicate module";
       btnDup.textContent = "⧉";
       btnDup.addEventListener("mousedown", (e) => e.stopPropagation());
       btnDup.addEventListener("click", () => duplicateModule(mod));
 
       const btnDel = document.createElement("button");
       btnDel.className = "mod-act-btn del";
-      btnDel.title = "Delete module";
+      btnDel.title = isLabel ? "Delete label" : "Delete module";
       btnDel.textContent = "×";
       btnDel.addEventListener("mousedown", (e) => e.stopPropagation());
       btnDel.addEventListener("click", () => deleteModule(mod.id));
 
-      actions.append(btnSaveTpl, btnDup, btnDel);
+      actions.append(btnDup, btnDel);
       header.append(titleInput, actions);
 
       header.addEventListener("mousedown", (e) => {
@@ -479,23 +485,6 @@
         };
         el.classList.add("dragging");
       });
-
-      const paramsWrap = document.createElement("div");
-      paramsWrap.className = "module-params";
-      mod.params.forEach((param) => {
-        paramsWrap.appendChild(createParamRow(mod, param));
-      });
-
-      const footer = document.createElement("div");
-      footer.className = "module-footer";
-      const addParamBtn = document.createElement("button");
-      addParamBtn.className = "add-param-btn";
-      addParamBtn.textContent = "+ Add Parameter";
-      addParamBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        openAddParamPopover(mod.id, e.clientX, e.clientY);
-      });
-      footer.appendChild(addParamBtn);
 
       const ports = [
         { cls: "port-audio-in", type: "audio", dir: "in", title: "Audio In (Left)" },
@@ -530,7 +519,29 @@
         el.appendChild(port);
       });
 
-      el.append(header, paramsWrap, footer);
+      el.append(header);
+
+      if (!isLabel) {
+        const paramsWrap = document.createElement("div");
+        paramsWrap.className = "module-params";
+        mod.params.forEach((param) => {
+          paramsWrap.appendChild(createParamRow(mod, param));
+        });
+
+        const footer = document.createElement("div");
+        footer.className = "module-footer";
+        const addParamBtn = document.createElement("button");
+        addParamBtn.className = "add-param-btn";
+        addParamBtn.textContent = "+ Add Parameter";
+        addParamBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          openAddParamPopover(mod.id, e.clientX, e.clientY);
+        });
+        footer.appendChild(addParamBtn);
+
+        el.append(paramsWrap, footer);
+      }
+
       dom.modulesLayer.appendChild(el);
     });
 
@@ -797,14 +808,19 @@
       let x1, y1, x2, y2;
 
       if (conn.type === "audio") {
+        const fromTopPad = fromBox.h < 60 ? 6 : 34;
+        const fromBotPad = fromBox.h < 60 ? 6 : 10;
+        const toTopPad = toBox.h < 60 ? 6 : 34;
+        const toBotPad = toBox.h < 60 ? 6 : 10;
+
         x1 = fromBox.x + fromBox.w;
-        y1 = fromBox.y + 34 + (fromBox.h - 42) * outFrac;
+        y1 = fromBox.y + fromTopPad + (fromBox.h - fromTopPad - fromBotPad) * outFrac;
         x2 = toBox.x;
-        y2 = toBox.y + 34 + (toBox.h - 42) * inFrac;
+        y2 = toBox.y + toTopPad + (toBox.h - toTopPad - toBotPad) * inFrac;
 
         if (Math.abs(y1 - y2) <= PARALLEL_SNAP_PX) {
-          const minY = Math.max(fromBox.y + 34, toBox.y + 34);
-          const maxY = Math.min(fromBox.y + fromBox.h - 10, toBox.y + toBox.h - 10);
+          const minY = Math.max(fromBox.y + fromTopPad, toBox.y + toTopPad);
+          const maxY = Math.min(fromBox.y + fromBox.h - fromBotPad, toBox.y + toBox.h - toBotPad);
           if (minY <= maxY) {
             const snappedY = clamp((y1 + y2) / 2, minY, maxY);
             y1 = snappedY;
@@ -812,14 +828,16 @@
           }
         }
       } else {
-        x1 = fromBox.x + 24 + (fromBox.w - 48) * outFrac;
+        const fromSidePad = Math.min(24, fromBox.w * 0.2);
+        const toSidePad = Math.min(24, toBox.w * 0.2);
+        x1 = fromBox.x + fromSidePad + (fromBox.w - fromSidePad * 2) * outFrac;
         y1 = fromBox.y;
-        x2 = toBox.x + 24 + (toBox.w - 48) * inFrac;
+        x2 = toBox.x + toSidePad + (toBox.w - toSidePad * 2) * inFrac;
         y2 = toBox.y + toBox.h;
 
         if (Math.abs(x1 - x2) <= PARALLEL_SNAP_PX) {
-          const minX = Math.max(fromBox.x + 20, toBox.x + 20);
-          const maxX = Math.min(fromBox.x + fromBox.w - 20, toBox.x + toBox.w - 20);
+          const minX = Math.max(fromBox.x + fromSidePad, toBox.x + toSidePad);
+          const maxX = Math.min(fromBox.x + fromBox.w - fromSidePad, toBox.x + toBox.w - toSidePad);
           if (minX <= maxX) {
             const snappedX = clamp((x1 + x2) / 2, minX, maxX);
             x1 = snappedX;
@@ -966,10 +984,11 @@
 
     const newMod = {
       id: uid("mod"),
+      ...(tpl.kind ? { kind: tpl.kind } : {}),
       title: tpl.title,
       x: snapX,
       y: snapY,
-      params: tpl.params.map((p) => ({ ...clone(p), id: uid("p") })),
+      params: (tpl.params || []).map((p) => ({ ...clone(p), id: uid("p") })),
     };
 
     patch.modules.push(newMod);
@@ -1316,9 +1335,17 @@
     requestAnimationFrame(renderConnections);
   });
 
-  // New Page & Blank Module
+  // New Page, Label Block & Blank Module
   dom.btnNewPatch.addEventListener("click", createNewPage);
   dom.btnAddPageBar.addEventListener("click", createNewPage);
+
+  dom.btnNewLabelBlock.addEventListener("click", () => {
+    addModuleFromTemplate({
+      kind: "label",
+      title: "EXT CV",
+      params: [],
+    });
+  });
 
   dom.btnNewBlankModule.addEventListener("click", () => {
     addModuleFromTemplate({
