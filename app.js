@@ -1360,7 +1360,7 @@
     if (!mod) return;
 
     const type = dom.newParamType.value;
-    const name = dom.newParamName.value.trim().toUpperCase() || "PARAM";
+    const name = dom.newParamName.value.trim() || "Param";
     const isDiscrete = type === "switch3" || type === "dropdown";
     const paramObj = {
       id: uid("p"),
@@ -1372,7 +1372,7 @@
     if (isDiscrete) {
       const parts = dom.newParamSwitchLabels.value
         .split(",")
-        .map((s) => s.trim().toUpperCase())
+        .map((s) => s.trim())
         .filter(Boolean);
       paramObj.labels = parts.length >= 2 ? parts : ["LO", "MID", "HI"];
     }
