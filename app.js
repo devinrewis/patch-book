@@ -605,7 +605,8 @@
       titleInput.addEventListener("mousedown", (e) => e.stopPropagation());
       if (isLabel) {
         const syncLabelWidth = () => {
-          titleInput.style.width = `${Math.max(6, titleInput.value.length + 1.5)}ch`;
+          const len = Math.max(6, titleInput.value.length);
+          titleInput.style.width = `calc(${len}ch + ${(len * 0.06).toFixed(2)}em + 18px)`;
         };
         syncLabelWidth();
         titleInput.addEventListener("input", () => {
@@ -617,7 +618,8 @@
         mod.title = titleInput.value.trim() || (isLabel ? "LABEL" : "MODULE");
         if (isLabel) {
           titleInput.value = mod.title;
-          titleInput.style.width = `${Math.max(6, titleInput.value.length + 1.5)}ch`;
+          const len = Math.max(6, titleInput.value.length);
+          titleInput.style.width = `calc(${len}ch + ${(len * 0.06).toFixed(2)}em + 18px)`;
         }
         persist();
         if (isLabel) requestAnimationFrame(renderConnections);
