@@ -36,6 +36,8 @@
   let draggingModule = null;
   let panning = null;
   let wiring = null; // { type: "audio"|"cv", fromId, startX, startY }
+  let draggingPageIndex = null;
+  let draggingParamInfo = null; // { modId, index }
   let selectedConnId = null;
   let activeParamTargetModId = null;
   let toastTimer = null;
@@ -364,21 +366,68 @@
       dom.bookList.appendChild(li);
     });
 
-    // Pages in active book
+    // Pages in active book (drag to reorder)
     dom.patchList.innerHTML = "";
     activeBook.patches.forEach((patch, i) => {
       const li = document.createElement("li");
       li.className = "patch-item" + (patch.id === activeBook.activePatchId ? " active" : "");
+      li.draggable = true;
 
       const meta = `Page ${i + 1} • ${patch.modules.length} mod${patch.modules.length === 1 ? "" : "s"}`;
 
       li.innerHTML = `
+        <span class="drag-grip" title="Drag to reorder page">⋮⋮</span>
         <div class="patch-item-info">
           <div class="patch-item-name">${escapeHtml(patch.name)}</div>
           <div class="patch-item-meta">${escapeHtml(meta)}</div>
         </div>
         ${activeBook.patches.length > 1 ? `<button class="patch-item-del" title="Delete page">×</button>` : ""}
       `;
+
+      li.addEventListener("dragstart", (e) => {
+        draggingPageIndex = i;
+        li.classList.add("dragging-item");
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", String(i));
+      });
+
+      li.addEventListener("dragover", (e) => {
+        if (draggingPageIndex === null || draggingPageIndex === i) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        const rect = li.getBoundingClientRect();
+        const isAbove = e.clientY < rect.top + rect.height / 2;
+        li.classList.toggle("drag-over-above", isAbove);
+        li.classList.toggle("drag-over-below", !isAbove);
+      });
+
+      li.addEventListener("dragleave", () => {
+        li.classList.remove("drag-over-above", "drag-over-below");
+      });
+
+      li.addEventListener("drop", (e) => {
+        e.preventDefault();
+        li.classList.remove("drag-over-above", "drag-over-below");
+        if (draggingPageIndex === null || draggingPageIndex === i) return;
+
+        const rect = li.getBoundingClientRect();
+        const isAbove = e.clientY < rect.top + rect.height / 2;
+        let targetIdx = isAbove ? i : i + 1;
+        if (draggingPageIndex < targetIdx) targetIdx -= 1;
+
+        const [moved] = activeBook.patches.splice(draggingPageIndex, 1);
+        activeBook.patches.splice(targetIdx, 0, moved);
+        draggingPageIndex = null;
+        persist();
+        renderTopBar();
+        renderPageBar();
+        renderSidebar();
+      });
+
+      li.addEventListener("dragend", () => {
+        draggingPageIndex = null;
+        li.classList.remove("dragging-item", "drag-over-above", "drag-over-below");
+      });
 
       li.addEventListener("click", (e) => {
         if (e.target.classList.contains("patch-item-del")) {
@@ -524,8 +573,8 @@
       if (!isLabel) {
         const paramsWrap = document.createElement("div");
         paramsWrap.className = "module-params";
-        mod.params.forEach((param) => {
-          paramsWrap.appendChild(createParamRow(mod, param));
+        mod.params.forEach((param, pIdx) => {
+          paramsWrap.appendChild(createParamRow(mod, param, pIdx));
         });
 
         const footer = document.createElement("div");
@@ -548,15 +597,85 @@
     requestAnimationFrame(renderConnections);
   }
 
-  function createParamRow(mod, param) {
+  function createParamRow(mod, param, paramIndex) {
     const row = document.createElement("div");
     row.className = "param-row";
+    row.draggable = false;
+
+    const grip = document.createElement("span");
+    grip.className = "drag-grip";
+    grip.textContent = "⋮⋮";
+    grip.title = "Drag to reorder parameter";
+    grip.addEventListener("mousedown", (e) => {
+      if (mode === "perform") return;
+      e.stopPropagation();
+      row.draggable = true;
+    });
+    grip.addEventListener("mouseup", () => {
+      row.draggable = false;
+    });
+
+    row.addEventListener("dragstart", (e) => {
+      if (!row.draggable) {
+        e.preventDefault();
+        return;
+      }
+      e.stopPropagation();
+      draggingParamInfo = { modId: mod.id, index: paramIndex };
+      row.classList.add("dragging-item");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", param.id);
+    });
+
+    row.addEventListener("dragover", (e) => {
+      if (!draggingParamInfo || draggingParamInfo.modId !== mod.id || draggingParamInfo.index === paramIndex) {
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = "move";
+      const rect = row.getBoundingClientRect();
+      const isAbove = e.clientY < rect.top + rect.height / 2;
+      row.classList.toggle("drag-over-above", isAbove);
+      row.classList.toggle("drag-over-below", !isAbove);
+    });
+
+    row.addEventListener("dragleave", () => {
+      row.classList.remove("drag-over-above", "drag-over-below");
+    });
+
+    row.addEventListener("drop", (e) => {
+      if (!draggingParamInfo || draggingParamInfo.modId !== mod.id || draggingParamInfo.index === paramIndex) {
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      row.classList.remove("drag-over-above", "drag-over-below");
+
+      const rect = row.getBoundingClientRect();
+      const isAbove = e.clientY < rect.top + rect.height / 2;
+      let targetIdx = isAbove ? paramIndex : paramIndex + 1;
+      if (draggingParamInfo.index < targetIdx) targetIdx -= 1;
+
+      const [moved] = mod.params.splice(draggingParamInfo.index, 1);
+      mod.params.splice(targetIdx, 0, moved);
+      draggingParamInfo = null;
+      persist();
+      renderModules();
+    });
+
+    row.addEventListener("dragend", () => {
+      row.draggable = false;
+      draggingParamInfo = null;
+      row.classList.remove("dragging-item", "drag-over-above", "drag-over-below");
+    });
 
     const nameInput = document.createElement("input");
     nameInput.className = "param-name-input";
     nameInput.value = param.name;
+    nameInput.addEventListener("mousedown", (e) => e.stopPropagation());
     nameInput.addEventListener("change", () => {
-      param.name = nameInput.value.trim() || "PARAM";
+      param.name = nameInput.value.trim() || "Param";
       persist();
     });
 
@@ -583,7 +702,7 @@
       renderModules();
     });
 
-    row.append(nameInput, controlWrap, removeBtn);
+    row.append(grip, nameInput, controlWrap, removeBtn);
     return row;
   }
 

@@ -431,6 +431,38 @@ html, body {
   gap: 6px;
 }
 
+.patch-item.dragging-item {
+  opacity: 0.45;
+}
+
+.patch-item.drag-over-above {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.patch-item.drag-over-below {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.drag-grip {
+  color: var(--text-dim);
+  font-size: 11px;
+  line-height: 1;
+  cursor: grab;
+  flex-shrink: 0;
+  letter-spacing: -1px;
+  padding: 2px 2px 2px 0;
+  opacity: 0.55;
+}
+
+.drag-grip:hover {
+  color: var(--accent);
+  opacity: 1;
+}
+
+.drag-grip:active {
+  cursor: grabbing;
+}
+
 .patch-item:hover {
   border-color: var(--border);
 }
@@ -694,8 +726,21 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
+  gap: 5px;
   min-height: 28px;
+  border-radius: 3px;
+}
+
+.param-row.dragging-item {
+  opacity: 0.4;
+}
+
+.param-row.drag-over-above {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.param-row.drag-over-below {
+  box-shadow: inset 0 -2px 0 var(--accent);
 }
 
 .param-name-input {
@@ -705,7 +750,7 @@ html, body {
   font-family: var(--font-mono);
   font-size: 10.5px;
   font-weight: 600;
-  width: 72px;
+  width: 66px;
   flex-shrink: 0;
   padding: 1px 2px;
   border-radius: 2px;
@@ -1196,6 +1241,7 @@ body.perform-mode .edit-only,
 body.perform-mode .module-actions,
 body.perform-mode .module-footer,
 body.perform-mode .param-remove-btn,
+body.perform-mode .drag-grip,
 body.perform-mode .port-handle {
   display: none !important;
 }
